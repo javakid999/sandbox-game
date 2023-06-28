@@ -8,6 +8,9 @@ export class Board {
     constructor(width: number, height: number) {
         this.size = [width, height]
         this.particle = Array(height).fill(0).map(() => Array(width).fill(null))
+        for(let i = 0; i < this.size[0]; i++) {
+            this.particle[this.size[1]-1][i] = new Stone()
+        }
     }
 
     render(canvas: Canvas) {
