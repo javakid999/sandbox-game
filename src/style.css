@@ -1,0 +1,19 @@
+canvas {
+    border: solid 1px black;
+}
+
+button {
+    border-radius: 0;
+    width: 100px;
+    height: 30px;
+    border: none;
+    background-color: #606060;
+}
+
+button.selected {
+    background-color: #808080;
+}
+
+button:hover {
+    background-color: #707070;
+}
