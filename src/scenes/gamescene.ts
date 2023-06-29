@@ -1,7 +1,7 @@
 import { Canvas } from "../api/canvas";
 import { InputManager } from "../api/inputmanager";
 import { Scene } from "../api/scene";
-import { Board } from "../game/board";
+import { Bedrock, Board } from "../game/board";
 
 export class GameScene extends Scene {
     assets: {[index: string]: HTMLImageElement}
@@ -17,6 +17,16 @@ export class GameScene extends Scene {
         document.getElementById('game')?.appendChild(document.createElement('br'))
 
         let button = document.createElement('button')
+        button.textContent = 'CLEAR'
+        button.onclick = () => {
+            this.board.particle = Array(this.board.size[1]).fill(0).map(() => Array(this.board.size[0]).fill(null))
+            for(let i = 0; i < this.board.size[0]; i++) {
+                this.board.particle[this.board.size[1]-1][i] = new Bedrock()
+            }
+        }
+        document.getElementById('game')?.appendChild(button)
+
+        button = document.createElement('button')
         button.textContent = 'SAND'
         button.onclick = () => {this.selectedParticle = 1}
         document.getElementById('game')?.appendChild(button)
@@ -51,9 +61,11 @@ export class GameScene extends Scene {
         button.onclick = () => {this.selectedParticle = 7}
         document.getElementById('game')?.appendChild(button)
 
+        document.getElementById('game')?.appendChild(document.createElement('br'))
+
         button = document.createElement('button')
-        button.textContent = 'CLEAR'
-        button.onclick = () => {this.board.particle = Array(this.board.size[1]).fill(0).map(() => Array(this.board.size[0]).fill(null))}
+        button.textContent = 'FIRE'
+        button.onclick = () => {this.selectedParticle = 8}
         document.getElementById('game')?.appendChild(button)
 
         this.canvas = canvas

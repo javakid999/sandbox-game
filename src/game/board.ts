@@ -9,7 +9,7 @@ export class Board {
         this.size = [width, height]
         this.particle = Array(height).fill(0).map(() => Array(width).fill(null))
         for(let i = 0; i < this.size[0]; i++) {
-            this.particle[this.size[1]-1][i] = new Stone()
+            this.particle[this.size[1]-1][i] = new Bedrock()
         }
     }
 
@@ -64,7 +64,7 @@ export class Board {
         if (particle instanceof Solid) {
             for (let i = -1; i <= 1; i++) {
                 for (let j = -1; j <= 1; j++) {
-                    if (!(i == 0 && j == 0) && i+y > 0 && i+y < this.size[1]-1 && j+x > 0 && j+x < this.size[0]-1 && !(this.particle[y+i][x+j] instanceof Solid || this.particle[y+i][x+j] instanceof Block)) {
+                    if (!(i == 0 && j == 0) && i+y > 0 && i+y < this.size[1]-1 && j+x > 0 && j+x < this.size[0]-1 && !(this.particle[y+i][x+j] instanceof Solid || this.particle[y+i][x+j] instanceof Block || this.particle[y+i][x+j] instanceof Fire)) {
                         neighbors[i+1][j+1] = true
                         if (this.particle[y+i][x+j] instanceof Liquid && particle.density <= this.particle[y+i][x+j]!.density) {
                             neighbors[i+1][j+1] = false
@@ -91,6 +91,24 @@ export class Board {
                     }
                 }
             }
+        } else if (particle instanceof Gas) {
+            if (particle instanceof Fire) {
+                for (let i = -1; i <= 1; i++) {
+                    for (let j = -1; j <= 1; j++) {
+                        if (!(i == 0 && j == 0) && i+y > 0 && i+y < this.size[1]-1 && j+x > 0 && j+x < this.size[0]-1 && this.particle[y+i][x+j]?.flammable) {
+                            neighbors[i+1][j+1] = true
+                        }
+                    }
+                }
+            } else {
+                for (let i = -1; i <= 1; i++) {
+                    for (let j = -1; j <= 1; j++) {
+                        if (!(i == 0 && j == 0) && i+y > 0 && i+y < this.size[1]-1 && j+x > 0 && j+x < this.size[0]-1 && !(this.particle[y+i][x+j] instanceof Solid || this.particle[y+i][x+j] instanceof Block || this.particle[y+i][x+j] instanceof Liquid)) {
+                            neighbors[i+1][j+1] = true
+                        }
+                    }
+                }
+            }
         }
         return neighbors
     }
@@ -109,8 +127,11 @@ export class Board {
                     if (this.particle[i][j] instanceof Lava && this.particle[i+1][j] instanceof Stone) {
                         newParticle[i+1][j] = new Lava()
                     } else if (this.particle[i][j] instanceof Lava) {
-                        if (this.particle[i+1][j] instanceof Water || this.particle[i][j-1] instanceof Water || this.particle[i][j+1] instanceof Water || this.particle[i-1][j] instanceof Water)
-                        newParticle[i][j] = new Stone()
+                        if (this.particle[i+1][j] instanceof Water || this.particle[i][j-1] instanceof Water || this.particle[i][j+1] instanceof Water || this.particle[i-1][j] instanceof Water) {
+                            newParticle[i][j] = new Stone();
+                        } else if (this.particle[i+1][j]?.flammable || this.particle[i][j-1]?.flammable || this.particle[i][j+1]?.flammable || this.particle[i-1][j]?.flammable) {
+                            newParticle[i][j] = new Fire();
+                        }
                     } 
 
                     if (neighbors[2][1]) {
@@ -160,8 +181,20 @@ export class Board {
                             } 
                         }
                     } else if (this.particle[i][j] instanceof Salt) {
-                        if (neighbors[2][1]) {
-                            if (this.particle[i+1][j] instanceof Water) {
+                        if (newParticle[i-1][j] instanceof Water) {
+                            newParticle[i][j] = null
+                            newParticle[i-1][j].salinity += 0.1
+                            newParticle[i-1][j].density += 0.05
+                        } else if (newParticle[i][j-1] instanceof Water) {
+                            newParticle[i][j] = null
+                            newParticle[i][j-1].salinity += 0.1
+                            newParticle[i][j-1].density += 0.05
+                        } else if (newParticle[i][j+1] instanceof Water) {
+                            newParticle[i][j] = null
+                            newParticle[i][j+1].salinity += 0.1
+                            newParticle[i][j+1].density += 0.05
+                        } else if (neighbors[2][1]) {
+                            if (newParticle[i+1][j] instanceof Water) {
                                 [newParticle[i+1][j], newParticle[i][j]] = [newParticle[i][j], newParticle[i+1][j]]
                                 newParticle[i+1][j] = null
                                 newParticle[i][j].salinity += 0.1
@@ -238,6 +271,43 @@ export class Board {
                             }
                         }
                     }
+                } else if (this.particle[i][j] instanceof Gas) {
+                    if (this.particle[i][j] instanceof Steam || this.particle[i][j] instanceof Smoke) {
+                        (newParticle[i][j] as Gas).lifetime-- ;
+                        if ((newParticle[i][j] as Gas).lifetime <= 0) {
+                            newParticle[i][j] = null
+                        } else {
+                            const dir = Math.random();
+                            if (dir < 0.33) {
+                                if (neighbors[1][0]) {
+                                    [newParticle[i][j-1], newParticle[i][j]] = [newParticle[i][j], newParticle[i][j-1]]
+                                }
+                            } else if (dir < 0.67) {
+                                if (neighbors[1][2]) {
+                                    [newParticle[i][j+1], newParticle[i][j]] = [newParticle[i][j], newParticle[i][j+1]]
+                                }
+                            } else {
+                                if (neighbors[0][1]) {
+                                    [newParticle[i-1][j], newParticle[i][j]] = [newParticle[i][j], newParticle[i-1][j]]
+                                }
+                            }
+                        }
+                    } else if (newParticle[i][j] instanceof Fire) {
+                        if (neighbors[0][1]) {
+                            if (Math.random() < 0.1) newParticle[i-1][j] = new Fire()
+                        } else if (neighbors[2][1]) {
+                            if (Math.random() < 0.1) newParticle[i+1][j] = new Fire()
+                        } else if (neighbors[1][0]) {
+                            if (Math.random() < 0.1) newParticle[i][j-1] = new Fire()
+                        } else if (neighbors[1][2]) {
+                            if (Math.random() < 0.1) newParticle[i][j+1] = new Fire()
+                        } else {
+                            (newParticle[i][j] as Gas).lifetime-- ;
+                            if ((newParticle[i][j] as Gas).lifetime <= 0) {
+                                newParticle[i][j] = new Smoke()
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -249,6 +319,9 @@ export class Board {
         const y = Math.floor(mousePos[1]/4)
         if (x > 0 && x < this.size[0]-1 && 1 >= 0 && y < this.size[1]-1)
         switch (type) {
+            case(8):
+                this.particle[y][x] = new Fire()
+                break;
             case(7):
                 this.particle[y][x] = new Seed()
                 break;
@@ -282,6 +355,7 @@ interface Particle {
     thickness: number
     color: number[]
     colorRandom: number[]
+    flammable: boolean;
 }
 
 abstract class Block {
@@ -305,13 +379,78 @@ abstract class Liquid {
     }
 }
 
+abstract class Gas {
+    type: string
+    lifetime: number
+    constructor() {
+        this.type = 'gas'
+        this.lifetime = 0
+    }
+}
+
+class Fire extends Gas implements Particle {
+    density: number
+    thickness: number
+    color: number[]
+    colorRandom: number[]
+    lifetime: number
+    flammable: boolean
+    constructor() {
+        super();
+        this.flammable = false
+        this.density = 1
+        this.lifetime = 3
+        this.thickness = 0
+        this.color = [255,50,0]
+        this.colorRandom = [-20,200,0]
+    }
+}
+
+class Steam extends Gas implements Particle {
+    density: number
+    thickness: number
+    color: number[]
+    colorRandom: number[]
+    lifetime: number
+    flammable: boolean
+    constructor() {
+        super();
+        this.flammable = false
+        this.density = 1
+        this.lifetime = 60
+        this.thickness = 0
+        this.color = [120,120,120]
+        this.colorRandom = [-40,-40,-40]
+    }
+}
+
+class Smoke extends Gas implements Particle {
+    density: number
+    thickness: number
+    color: number[]
+    colorRandom: number[]
+    lifetime: number
+    flammable: boolean
+    constructor() {
+        super();
+        this.flammable = false
+        this.density = 1
+        this.lifetime = 60
+        this.thickness = 0
+        this.color = [50,50,50]
+        this.colorRandom = [-40,-40,-40]
+    }
+}
+
 class Sand extends Solid implements Particle {
     density: number
     thickness: number
     color: number[]
     colorRandom: number[]
+    flammable: boolean
     constructor() {
         super();
+        this.flammable = true
         this.density = 1
         this.thickness = 0
         this.color = [220,200,10]
@@ -324,8 +463,10 @@ class Salt extends Solid implements Particle {
     thickness: number
     color: number[]
     colorRandom: number[]
+    flammable: boolean
     constructor() {
         super();
+        this.flammable = false
         this.density = 0.6
         this.thickness = 0
         this.color = [220,220,220]
@@ -338,11 +479,29 @@ class Stone extends Block implements Particle {
     thickness: number
     color: number[]
     colorRandom: number[]
+    flammable: boolean
     constructor() {
         super();
+        this.flammable = false
         this.density = 1
         this.thickness = 1
         this.color = [100,100,100]
+        this.colorRandom = [25,25,25]
+    }
+}
+
+export class Bedrock extends Block implements Particle {
+    density: number
+    thickness: number
+    color: number[]
+    colorRandom: number[]
+    flammable: boolean
+    constructor() {
+        super();
+        this.flammable = false
+        this.density = 1
+        this.thickness = 1
+        this.color = [50,50,50]
         this.colorRandom = [25,25,25]
     }
 }
@@ -353,8 +512,10 @@ class Water extends Liquid implements Particle {
     color: number[]
     colorRandom: number[]
     salinity: number
+    flammable: boolean
     constructor() {
         super();
+        this.flammable = false
         this.salinity = 0
         this.density = 0.5
         this.thickness = 0.1
@@ -369,8 +530,10 @@ class Slime extends Liquid implements Particle {
     color: number[]
     colorRandom: number[]
     salinity: number
+    flammable: boolean
     constructor() {
         super();
+        this.flammable = false
         this.salinity = 0
         this.density = 0.7
         this.thickness = 0.5
@@ -385,8 +548,10 @@ class Lava extends Liquid implements Particle {
     color: number[]
     colorRandom: number[]
     salinity: number
+    flammable: boolean
     constructor() {
         super();
+        this.flammable = false
         this.salinity = 0
         this.density = 0.9
         this.thickness = 0.8
@@ -400,8 +565,10 @@ class Seed extends Solid implements Particle {
     thickness: number
     color: number[]
     colorRandom: number[]
+    flammable: boolean
     constructor() {
         super();
+        this.flammable = true
         this.density = 0.7
         this.thickness = 0.5
         this.color = [202, 204, 75]
@@ -415,8 +582,10 @@ class Stem extends Block implements Particle {
     color: number[]
     colorRandom: number[]
     energy: number
+    flammable: boolean
     constructor() {
         super();
+        this.flammable = true
         this.energy = 0
         this.density = 1
         this.thickness = 1
@@ -431,8 +600,10 @@ class Flower extends Block implements Particle {
     color: number[]
     colorRandom: number[]
     energy: number
+    flammable: boolean
     constructor() {
         super();
+        this.flammable = true
         this.energy = 0
         this.density = 1
         this.thickness = 1
